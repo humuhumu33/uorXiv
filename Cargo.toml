@@ -1,0 +1,10 @@
+[package]
+name = "uor-xiv"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "Apache-2.0"
+description = "Consumer of uor-foundation from crates.io"
+
+[dependencies]
+uor-foundation = "0.1.5"
