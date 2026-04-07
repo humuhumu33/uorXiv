@@ -11,7 +11,10 @@ pub mod workspace;
 pub use ipld::{RunRecord, TraceMetricsRecord, WorkspaceRoot, WORKSPACE_KIND, RUN_KIND};
 pub use primitives::AppPrimitives;
 pub use sandbox::{run_wasm_wasi, WasmRunLimits, WasmRunOutcome};
-pub use store::{ContentStore, IpfsCliError, IpfsCliStore, MemoryStore};
+pub use store::{
+    ContentStore, IpfsCliError, IpfsCliStore, LocalFsStore, MemoryStore, LOCAL_BLOB_PREFIX,
+    LOCAL_DAG_PREFIX,
+};
 pub use uor_impl::CidAddress;
 pub use run_ops::{persist_outcome, persist_wasm_run};
 pub use workspace::WorkspaceError;

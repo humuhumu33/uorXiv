@@ -5,14 +5,17 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::fs;
 use std::path::PathBuf;
 use uor_xiv::sandbox::WasmRunLimits;
-use uor_xiv::store::{ContentStore, IpfsCliStore, MemoryStore};
+use uor_xiv::store::{ContentStore, IpfsCliStore, LocalFsStore, MemoryStore};
 use uor_xiv::workspace::{fork_workspace, load_workspace, merge_workspaces, put_entry, save_workspace, MergeStrategy};
 use uor_xiv::{persist_wasm_run, CidAddress, WorkspaceRoot};
 
 #[derive(Parser)]
 #[command(name = "uor-xiv", about = "UOR-rooted shared workspace (IPFS + Wasm)")]
 struct Cli {
-    /// Use in-memory store instead of the IPFS CLI (no `ipfs` required).
+    /// Persistent local store directory (SHA-256 addressed blobs/dags; no `ipfs` daemon).
+    #[arg(long, global = true, value_name = "DIR")]
+    store: Option<PathBuf>,
+    /// Ephemeral in-process store only (cannot chain commands across runs).
     #[arg(long, global = true)]
     memory: bool,
 
@@ -33,6 +36,10 @@ enum Commands {
     /// Put JSON file as DAG-JSON; print CID.
     DagPut {
         path: PathBuf,
+    },
+    /// Pretty-print a DAG JSON node by CID.
+    DagShow {
+        cid: String,
     },
     /// Create an empty workspace manifest.
     WorkspaceNew,
@@ -105,6 +112,7 @@ impl From<MergeStrategyArg> for MergeStrategy {
 enum StoreKind {
     Ipfs(IpfsCliStore),
     Mem(MemoryStore),
+    Local(LocalFsStore),
 }
 
 impl StoreKind {
@@ -112,16 +120,17 @@ impl StoreKind {
         match self {
             StoreKind::Ipfs(s) => s,
             StoreKind::Mem(s) => s,
+            StoreKind::Local(s) => s,
         }
     }
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let store = if cli.memory {
-        StoreKind::Mem(MemoryStore::default())
-    } else {
-        StoreKind::Ipfs(IpfsCliStore::default())
+    let store = match (&cli.store, cli.memory) {
+        (Some(dir), _) => StoreKind::Local(LocalFsStore::open(dir)?),
+        (None, true) => StoreKind::Mem(MemoryStore::default()),
+        (None, false) => StoreKind::Ipfs(IpfsCliStore::default()),
     };
     let s = store.as_store();
 
@@ -140,6 +149,10 @@ fn main() -> Result<()> {
             let v: serde_json::Value = serde_json::from_str(&text).context("parse json")?;
             let cid = s.dag_put_json(&v)?;
             println!("{}", cid);
+        }
+        Commands::DagShow { cid } => {
+            let v = s.dag_get_json(&cid)?;
+            println!("{}", serde_json::to_string_pretty(&v)?);
         }
         Commands::WorkspaceNew => {
             let w = WorkspaceRoot::empty();

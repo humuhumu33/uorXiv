@@ -1,13 +1,27 @@
-//! Content-addressed storage: IPFS CLI adapter and in-memory test double.
+//! Content-addressed storage: IPFS CLI adapter, local disk store, and in-memory test double.
 
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::fs;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use thiserror::Error;
+
+/// Prefix for blob CIDs in [`LocalFsStore`] (`uorx-b-` + 64-char hex SHA-256).
+pub const LOCAL_BLOB_PREFIX: &str = "uorx-b-";
+/// Prefix for DAG JSON CIDs in [`LocalFsStore`] (`uorx-d-` + 64-char hex SHA-256).
+pub const LOCAL_DAG_PREFIX: &str = "uorx-d-";
+
+fn sha256_hex(data: &[u8]) -> String {
+    let mut h = Sha256::new();
+    h.update(data);
+    format!("{:x}", h.finalize())
+}
 
 #[derive(Debug, Error)]
 pub enum IpfsCliError {
@@ -142,6 +156,97 @@ impl MemoryStore {
     fn alloc_cid(inner: &mut MemoryStoreInner, prefix: &str) -> String {
         inner.next += 1;
         format!("{}{:016x}", prefix, inner.next)
+    }
+}
+
+/// Persistent store on disk: no Kubo/IPFS. Content-addressed by SHA-256 of raw bytes / JSON bytes.
+///
+/// Layout: `<root>/blobs/<hex>`, `<root>/dags/<hex>`, `<root>/pins/<escaped-cid>`.
+#[derive(Debug, Clone)]
+pub struct LocalFsStore {
+    root: PathBuf,
+}
+
+impl LocalFsStore {
+    /// Create directories and open a store at `root`.
+    pub fn open(root: impl Into<PathBuf>) -> Result<Self> {
+        let root = root.into();
+        fs::create_dir_all(root.join("blobs")).context("create blobs dir")?;
+        fs::create_dir_all(root.join("dags")).context("create dags dir")?;
+        fs::create_dir_all(root.join("pins")).context("create pins dir")?;
+        Ok(Self { root })
+    }
+
+    fn blob_path(&self, hex: &str) -> PathBuf {
+        self.root.join("blobs").join(hex)
+    }
+
+    fn dag_path(&self, hex: &str) -> PathBuf {
+        self.root.join("dags").join(hex)
+    }
+
+    fn parse_blob_cid(cid: &str) -> Result<&str> {
+        cid.strip_prefix(LOCAL_BLOB_PREFIX)
+            .ok_or_else(|| anyhow!("expected blob cid prefix {}", LOCAL_BLOB_PREFIX))
+    }
+
+    fn parse_dag_cid(cid: &str) -> Result<&str> {
+        cid.strip_prefix(LOCAL_DAG_PREFIX)
+            .ok_or_else(|| anyhow!("expected dag cid prefix {}", LOCAL_DAG_PREFIX))
+    }
+
+    fn pin_path(&self, cid: &str) -> PathBuf {
+        let safe: String = cid
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '_' })
+            .collect();
+        self.root.join("pins").join(safe)
+    }
+}
+
+impl ContentStore for LocalFsStore {
+    fn add_blob(&self, data: &[u8]) -> Result<String> {
+        let hex = sha256_hex(data);
+        let path = self.blob_path(&hex);
+        if !path.exists() {
+            fs::write(&path, data).with_context(|| format!("write {}", path.display()))?;
+        }
+        Ok(format!("{}{}", LOCAL_BLOB_PREFIX, hex))
+    }
+
+    fn cat_blob(&self, cid: &str) -> Result<Vec<u8>> {
+        let hex = Self::parse_blob_cid(cid)?;
+        if hex.len() != 64 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(anyhow!("invalid blob hash in cid"));
+        }
+        let path = self.blob_path(hex);
+        fs::read(&path).with_context(|| format!("read blob {}", path.display()))
+    }
+
+    fn dag_put_json(&self, value: &Value) -> Result<String> {
+        let json = serde_json::to_vec(value).context("serialize dag json")?;
+        let hex = sha256_hex(&json);
+        let path = self.dag_path(&hex);
+        if !path.exists() {
+            fs::write(&path, &json).with_context(|| format!("write {}", path.display()))?;
+        }
+        Ok(format!("{}{}", LOCAL_DAG_PREFIX, hex))
+    }
+
+    fn dag_get_json(&self, cid: &str) -> Result<Value> {
+        let hex = Self::parse_dag_cid(cid)?;
+        if hex.len() != 64 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(anyhow!("invalid dag hash in cid"));
+        }
+        let path = self.dag_path(hex);
+        let bytes = fs::read(&path).with_context(|| format!("read dag {}", path.display()))?;
+        serde_json::from_slice(&bytes).context("parse dag json")
+    }
+
+    fn pin(&self, cid: &str) -> Result<()> {
+        let marker = self.pin_path(cid);
+        fs::write(&marker, b"1\n").with_context(|| format!("write pin {}", marker.display()))?;
+        Ok(())
     }
 }
 

@@ -15,6 +15,13 @@ thiserror = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 wasmtime = "27.0"
 wasmtime-wasi = "27.0"
+sha2 = "0.10"
+axum = { version = "0.7", features = ["multipart"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
+tower-http = { version = "0.5", features = ["cors"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lib]
 name = "uor_xiv"
@@ -23,3 +30,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "uor-xiv"
 path = "src/main.rs"
+
+[[bin]]
+name = "uor-xiv-serve"
+path = "src/bin/serve.rs"

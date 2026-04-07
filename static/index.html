@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>uor-xiv — local sandbox</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>uor-xiv</h1>
+    <p class="muted">Loopback preview · fork / merge / pin · Wasm runs · data in <code>--store</code> dir</p>
+  </header>
+
+  <section>
+    <h2>Workspace CID</h2>
+    <input type="text" id="workspaceCid" placeholder="uorx-d-…" spellcheck="false" />
+    <button type="button" id="btnUseLast">Use last CID</button>
+  </section>
+
+  <section>
+    <h2>Blobs</h2>
+    <input type="file" id="blobFile" />
+    <button type="button" id="btnUploadBlob">Upload blob</button>
+  </section>
+
+  <section>
+    <h2>Workspace</h2>
+    <div class="row">
+      <button type="button" id="btnNewWs">New workspace</button>
+      <button type="button" id="btnShowWs">Show JSON</button>
+      <button type="button" id="btnFork">Fork</button>
+      <button type="button" id="btnPublish">Pin (publish)</button>
+    </div>
+    <div class="row gap">
+      <label>Entry name <input type="text" id="entryName" placeholder="note" /></label>
+      <label>Target CID <input type="text" id="entryCid" placeholder="uorx-b-…" spellcheck="false" /></label>
+      <button type="button" id="btnPutEntry">Put entry</button>
+    </div>
+    <div class="row gap">
+      <label>Merge base <input type="text" id="mergeBase" spellcheck="false" /></label>
+      <label>Merge other <input type="text" id="mergeOther" spellcheck="false" /></label>
+      <label>Strategy
+        <select id="mergeStrategy">
+          <option value="strict">strict</option>
+          <option value="ours">ours</option>
+          <option value="theirs">theirs</option>
+        </select>
+      </label>
+      <button type="button" id="btnMerge">Merge</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>DAG</h2>
+    <input type="text" id="dagCid" placeholder="uorx-d-…" spellcheck="false" />
+    <button type="button" id="btnDag">Fetch JSON</button>
+  </section>
+
+  <section>
+    <h2>Run Wasm (WASI preview1)</h2>
+    <input type="file" id="wasmFile" accept=".wasm,application/wasm" />
+    <label>Fuel <input type="number" id="runFuel" value="10000000" min="1" /></label>
+    <label>Guest argv (JSON array) <input type="text" id="runArgs" value="[&quot;guest.wasm&quot;]" spellcheck="false" class="wide" /></label>
+    <label>input_cids (JSON array, optional) <input type="text" id="runInputs" value="[]" spellcheck="false" class="wide" /></label>
+    <button type="button" id="btnRun">Run</button>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <pre id="out"></pre>
+  </section>
+
+  <footer class="muted">
+    Bind is loopback-only. No auth. Use Cursor / VS Code Simple Browser or your browser at the URL printed by <code>uor-xiv-serve</code>.
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
