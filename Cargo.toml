@@ -2,9 +2,24 @@
 name = "uor-xiv"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.74"
 license = "Apache-2.0"
-description = "Consumer of uor-foundation from crates.io"
+description = "UOR-rooted shared workspace over IPFS with Wasm execution"
 
 [dependencies]
 uor-foundation = "0.1.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+wasmtime = "27.0"
+wasmtime-wasi = "27.0"
+
+[lib]
+name = "uor_xiv"
+path = "src/lib.rs"
+
+[[bin]]
+name = "uor-xiv"
+path = "src/main.rs"
